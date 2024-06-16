@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dangerous Writing Prompt</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            font-size: 16px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .controls {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dangerous Writing Prompt</h1>
+    <div class="controls">
+        <button id="generate-text">Generate Random Text</button>
+        <p>Number of letters: <span id="letter-count">0</span></p>
+    </div>
+    <textarea id="input-text" placeholder="Start typing here..."></textarea>
+    <p id="status-message"></p>
+
+    <script>
+        var typingTimer;
+        var deleteTimer;
+        var doneTypingInterval = 5000;  // 5 seconds
+        var deleteInterval = 5000;  // 5 seconds
+
+        // Function to update letter count
+        function updateLetterCount() {
+            var text = document.getElementById('input-text').value;
+            document.getElementById('letter-count').innerText = text.length;
+        }
+
+        // Function to save text to server
+        function saveText(text) {
+            fetch('/save_text', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'text=' + encodeURIComponent(text)
+            })
+            .then(response => response.json())
+            .then(data => console.log(data))
+            .catch(error => console.error('Error:', error));
+        }
+
+        // Function to periodically check and delete letters
+        function checkText() {
+            clearTimeout(typingTimer);
+            var text = document.getElementById('input-text').value.trim();
+
+            if (text !== '') {
+                saveText(text);
+                updateLetterCount();
+            }
+
+            typingTimer = setTimeout(function() {
+                if (document.getElementById('input-text').value.length > 0) {
+                    document.getElementById('status-message').innerText = 'Your text is being deleted because you stopped typing.';
+                    resetDeleteTimer();
+                }
+            }, doneTypingInterval);
+        }
+
+        // Function to generate random text
+        function generateText() {
+            fetch('/generate_text')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('input-text').value = data.text;
+                document.getElementById('status-message').innerText = '';
+                updateLetterCount();
+                resetDeleteTimer();
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // Function to delete a single letter
+        function deleteLetter() {
+            var text = document.getElementById('input-text').value;
+            if (text.length > 0) {
+                document.getElementById('input-text').value = text.slice(0, -1);
+                updateLetterCount();
+            } else {
+                clearInterval(deleteTimer);
+                document.getElementById('status-message').innerText = 'All text deleted.';
+            }
+        }
+
+        // Function to reset delete timer
+        function resetDeleteTimer() {
+            clearInterval(deleteTimer);
+            deleteTimer = setInterval(deleteLetter, deleteInterval);
+        }
+
+        // Event listener for text input
+        document.getElementById('input-text').addEventListener('input', function() {
+            document.getElementById('status-message').innerText = '';
+            checkText();
+            resetDeleteTimer();
+        });
+
+        // Event listener for generate text button
+        document.getElementById('generate-text').addEventListener('click', generateText);
+
+        // Function to load text from server
+        function loadText() {
+            fetch('/get_text')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('input-text').value = data.text;
+                updateLetterCount();
+                if (data.text.length > 0) {
+                    resetDeleteTimer();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        // Load text when page is loaded
+        loadText();
+    </script>
+</body>
+</html>
